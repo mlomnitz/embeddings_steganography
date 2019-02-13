@@ -10,6 +10,7 @@ from RevealNet import RevealNet
 from HidingUNet import UnetGenerator
 from utils import *
 from embeddings import glove
+from gif_dataset import GIF_dataset
 # Global variables
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -17,7 +18,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class encoder_decoder(): 
     def __init__(self, encoder=None, decoder=None, glove_path='../GLoVE',
                  dis_path='../PyTorch-Deep-Image-Steganography/checkPoint',
-                 cover_dir='../../NIPS/Datasets/tiny-imagenet-200/train',
+                 cover_dir='./GIFsource/frames',
                  cover_transform=None):
         embeddings = glove(glove_path=glove_path)
         self.vectors = embeddings.vectors
@@ -53,10 +54,9 @@ class encoder_decoder():
     @staticmethod
     def init_cover(cover_dir='', cover_transform=None):
         
-        coverset = torchvision.datasets.ImageFolder(cover_dir,
-                                                    transform=cover_transform)
+        coverset = GIF_dataset(transform=cover_transform, folder_path=cover_dir)
         coverloader = torch.utils.data.DataLoader(coverset, batch_size=1,
-                                                  shuffle=True, num_workers=1)
+                                                  shuffle=False, num_workers=1)
         return coverloader
     
     #
@@ -81,10 +81,12 @@ class encoder_decoder():
         converted = self.convert_message(message=message,
                                          n_images=n_images)
         row = 0
-        for idx in range(len(converted)//self.n_words):
+        for idx, cover in enumerate(self.coverloader):
+            if idx == len(converted)//self.n_words:
+                break
             lower = idx*self.n_words
             upper = (idx+1)*self.n_words
-            original, covered = self.hide_message(converted[lower:upper])
+            original, covered = self.hide_message(cover, converted[lower:upper])
             reco_message += '{}'.format(self.uncover_message(covered))
             row += len(self.uncover_message(covered))
             if row > 60:
@@ -108,9 +110,8 @@ class encoder_decoder():
         return converted
     
     #
-    def hide_message(self, message=None):
+    def hide_message(self, cover=None, message=None):
         with torch.set_grad_enabled(False):
-            cover, label = iter(self.coverloader).next()
             image = self.encoder(self.label_2_embeddings(
                 torch.tensor(message)).to(device))
 
