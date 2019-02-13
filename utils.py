@@ -20,7 +20,7 @@ def make_fig(original, covered, text):
     imshow(covered)
     #
     ax = plt.subplot(gs[2])
-    plt.text(0.1, 0.4, text, size=10)
+    plt.text(0.1, 0.1, text, size=10)
     plt.axis('off')
     plt.close()
     return fig

@@ -2,6 +2,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class UpsampleBlock(nn.Module):
+    def __init__(self, in_size, out_size):
+        super(self, UpsampleBlock).__init__()
+        self.upsample_block = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear'),
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(in_size, out_size, kernel_size=3, stride=1, padding=0)
+        )
+
+    def forward(self, x):
+        return self.upsample_block(x)
+
+
 class deconv_block(nn.Module):
     def __init__(self, in_size, inter_size, out_size):
         super(deconv_block, self).__init__()
