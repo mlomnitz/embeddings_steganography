@@ -86,14 +86,15 @@ class encoder_decoder():
                 break
             lower = idx*self.n_words
             upper = (idx+1)*self.n_words
-            original, covered = self.hide_message(cover, converted[lower:upper])
-            reco_message += '{}'.format(self.uncover_message(covered))
+            original, message, covered = self.hide_message(cover, converted[lower:upper])
+            this_frame = '{}'.format(self.uncover_message(covered))
+            reco_message += this_frame
             row += len(self.uncover_message(covered))
-            if row > 60:
+            if row > 130:
                 reco_message += '\n'
                 row = 0
     
-            fig = make_fig(original[0], covered[0], reco_message)
+            fig = make_fig(original[0].cpu(), covered[0].cpu(), reco_message)
             fig.savefig('{}/{}.png'.format(save_path, idx))
             
     #
@@ -116,7 +117,7 @@ class encoder_decoder():
                 torch.tensor(message)).to(device))
 
             cat_image = torch.cat([cover.to(device), image], dim=1)
-            return cover, self.Hnet(cat_image)
+            return cover, image, self.Hnet(cat_image)
     #
     
     def uncover_message(self, image=None):
