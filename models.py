@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class UpsampleBlock(nn.Module):
+class upsample_block(nn.Module):
     def __init__(self, in_size, out_size):
-        super(self, UpsampleBlock).__init__()
+        super(upsample_block, self).__init__()
         self.upsample_block = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear'),
             nn.ReflectionPad2d(1),
@@ -32,7 +32,7 @@ class deconv_block(nn.Module):
     
 
 class encoder(nn.Module):
-    def __init__(self, n_words=1, embeddings_dim=50):
+    def __init__(self, n_words=1, embeddings_dim=50, upsample=False):
         super(encoder, self).__init__()
         self.n_words = n_words
         self.embeddings_dim = embeddings_dim
@@ -42,8 +42,16 @@ class encoder(nn.Module):
         out_sizes = [256, 128, 64, 3]
         #
         self.down_path = nn.ModuleList()
-        for idx in range(len(in_sizes)):
-            self.down_path.append(deconv_block(in_sizes[idx], inter_sizes[idx], out_sizes[idx]))
+        if upsample:
+            for idx in range(len(in_sizes)):
+                self.down_path.append(upsample_block(in_sizes[idx],
+                                                     out_sizes[idx]))
+        else:
+            for idx in range(len(in_sizes)):
+                self.down_path.append(deconv_block(in_sizes[idx],
+                                                   inter_sizes[idx],
+                                                   out_sizes[idx]))
+        #
         self.fc = nn.Linear(embeddings_dim*n_words, 65536)
     
     def forward(self, x):
