@@ -17,12 +17,12 @@ class GIF_dataset(Dataset):
         def sort(path=''):
             dataset = []
             for idx in range(len(os.listdir(path))):
-                dataset.append('{}/frame{}.png'.format(path, idx+1))
+                dataset.append('{}/frame{}.png'.format(path, idx))
             return dataset
         self.datasetid_to_filepath = sort(folder_path)
                     
     def __getitem__(self, index):
-        image = Image.open(self.datasetid_to_filepath[index])
+        image = Image.open(self.datasetid_to_filepath[index]).convert('RGB')
         # Add transforms
         image = self.transform(image)
         return image
