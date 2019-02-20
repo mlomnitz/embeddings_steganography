@@ -4,6 +4,7 @@ import re
 import shutil
 from random import sample
 import numpy as np
+from tqdm import tqdm
 # PyTorch imports
 import torch
 import torch.nn as nn
@@ -127,14 +128,17 @@ class encoder_decoder():
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
         #
+        progress_bar = tqdm(total=len(converted))
         for idx, cover in enumerate(self.coverloader):
+            progress_bar.update(self.n_words)
             lower = idx*self.n_words
             upper = (idx+1)*self.n_words
             if upper > len(converted):
                 break
             cover, secret, container = self.hide_message(cover, converted[lower:upper])
             fig = save_frame(container[0], output='{}/frame{}.png'.format(temp_dir, idx))
-
+        progress_bar.close()
+        print('Saving encoded message to {}/message.png'.format(save_path))
         frames_to_gif(source_dir=temp_dir,
                       save_path='{}/message.png'.format(save_path))
         shutil.rmtree(temp_dir)
@@ -152,14 +156,18 @@ class encoder_decoder():
                                                   shuffle=False, num_workers=1)
         message = ''
         tot_frames = len(os.listdir(temp_dir))
+        progress_bar = tqdm(total=tot_frames)
         for idx, frame in enumerate(frameloader):
+            progress_bar.update(1)
             if idx == tot_frames:
                 break
             frame = frame.to(device)
             this_frame, revealed = self.uncover_message(frame)
             message += ' '+this_frame
+        progress_bar.close()
         shutil.rmtree(temp_dir)
         text_file = open(save_path, 'w')
+        print('Saving decoded message to {}'.format(save_path))
         text_file.write(message)
         text_file.close()
         return message
