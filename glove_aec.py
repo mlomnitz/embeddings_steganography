@@ -7,21 +7,23 @@ import numpy as np
 # PyTorch imports
 import torch
 import torch.nn as nn
-import torchvision
+import torchvision.transforms as transforms
 # Project imports
 from RevealNet import RevealNet
 from HidingUNet import UnetGenerator
 from utils import *
 from embeddings import glove
 from gif_dataset import GIF_dataset
+from definitions import local_path
 # Global variables
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class encoder_decoder(): 
-    def __init__(self, encoder=None, decoder=None, glove_path='../GLoVE',
-                 dis_path='../PyTorch-Deep-Image-Steganography/checkPoint',
-                 cover_dir='./GIFsource/frames',
+    def __init__(self, encoder=None, decoder=None,
+                 glove_path='{}/embeddings'.format(local_path),
+                 dis_path='{}/weights'.format(local_path),
+                 cover_dir='./GIFsource/frames'.format(local_path),
                  cover_transform=None):
         embeddings = glove(glove_path=glove_path)
         self.vectors = embeddings.vectors
@@ -33,29 +35,34 @@ class encoder_decoder():
         self.Hnet = UnetGenerator(input_nc=6, output_nc=3, num_downs=7,
                                   output_function=nn.Sigmoid).to(device)
         self.Rnet = RevealNet(output_function=nn.Sigmoid).to(device)
-        Hchpt = 'epoch_73,sumloss=0.000447,Hloss=0.000258'
-        Rchpt = 'epoch_73,sumloss=0.000447,Rloss=0.000252'
-        self.Hnet.load_state_dict(torch.load('{}/netH_{}.pth'.format(dis_path,
-                                                                     Hchpt)))
+        self.Hnet.load_state_dict(torch.load('{}/netH.pth.tar'.format(dis_path)))
         self.Hnet.eval()
         #
-        self.Rnet.load_state_dict(torch.load('{}/netR_{}.pth'.format(dis_path,
-                                                                     Rchpt)))
+        self.Rnet.load_state_dict(torch.load('{}/netR.pth.tar'.format(dis_path)))
         self.Rnet.eval()
         #
-        self.encoder = encoder.to(device)
-        self.encoder.eval()
+        if encoder is not None:
+            self.encoder = encoder.to(device)
+            self.encoder.eval()
+            self.n_words = encoder.n_words
         #
-        self.decoder = decoder.to(device)
-        self.decoder.eval()
+        if decoder is not None:
+            self.decoder = decoder.to(device)
+            self.decoder.eval()
+            self.n_words = decoder.n_words
         #
-        self.n_words = decoder.n_words
         #
         self.coverloader = self.init_cover(cover_dir, cover_transform)
         
     #
     @staticmethod
     def init_cover(cover_dir='', cover_transform=None):
+        if cover_transform is None:
+            cover_transform = transforms.Compose([
+                transforms.CenterCrop(620),
+                transforms.Resize(256),
+                transforms.ToTensor()
+            ])
         
         coverset = GIF_dataset(transform=cover_transform, folder_path=cover_dir)
         coverloader = torch.utils.data.DataLoader(coverset, batch_size=1,
