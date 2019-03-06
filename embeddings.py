@@ -37,6 +37,7 @@ class glove():
         self.vectors = bcolz.open('{}/6B.50.dat'.format(glove_path))[:]
         self.words = pickle.load(open('{}/6B.50_words.pkl'.format(glove_path), 'rb'))
         self.word2idx = pickle.load(open('{}/6B.50_idx.pkl'.format(glove_path), 'rb'))
+        self.words[self.word2idx['blank']] = ''
         self.vocab_size = len(self.vectors)
     
     
