@@ -5,6 +5,7 @@ import shutil
 from random import sample
 import numpy as np
 from tqdm import tqdm
+from collections import Counter
 # PyTorch imports
 import torch
 import torch.nn as nn
@@ -27,7 +28,7 @@ class encoder_decoder():
                  cover_dir='./GIFsource/frames'.format(local_path),
                  cover_transform=None):
         embeddings = glove(glove_path=glove_path)
-        self.vectors = embeddings.vectors
+        self.vectors = torch.from_numpy(embeddings.vectors).float()
         self.words = embeddings.words
         self.word2idx = embeddings.word2idx
         self.vocab_size = len(self.vectors)
@@ -74,9 +75,16 @@ class encoder_decoder():
     def label_2_embeddings(self, labels, embedding_size=50):
         embedding = torch.FloatTensor(labels.shape[0], embedding_size).zero_()
         for idx, label in enumerate(labels):
-            embedding[idx] = torch.from_numpy(self.vectors[label])
+            embedding[idx] = self.vectors[label]
             
         return embedding
+
+    #
+    def validate_message(self, message=''):
+        words = Counter(re.findall(r"[\w']+|[.,!?;]", message))
+        for key in words.keys():
+            if key not in self.words2idx:
+                print('Embedding missing for {}, please replace '.format(key))
 
     #
     def random_insert_seq(self, lst, seq):
@@ -115,9 +123,8 @@ class encoder_decoder():
             encripted_message = self.decoder(revealed)
             message = ''
             for word in encripted_message:
-                embedding = word.detach().cpu().numpy().reshape((50,))
-                predicted = torch.from_numpy(
-                    cos_matrix_multiplication(self.vectors, embedding))
+                embedding = word.detach().reshape((1,50))
+                predicted = nn.CosineSimilarity()(self.vectors.to(device), embedding)
                 message += '{} '.format(self.words[predicted.argmax()])
             return message, revealed
 
