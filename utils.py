@@ -21,8 +21,8 @@ def save_frame(frame, output):
     
 def make_fig(original, covered, hidden, recovered, pix_error, psnr, full_text,
              scale=10):
-    fig = plt.figure(figsize=(20, 15))
-    gs = gridspec.GridSpec(3, 4)
+    fig = plt.figure(figsize=(25, 15))
+    gs = gridspec.GridSpec(3, 5)
     #
     ax = plt.subplot(gs[0, 0])
     imshow(original)
@@ -67,7 +67,7 @@ def make_fig(original, covered, hidden, recovered, pix_error, psnr, full_text,
     plt.bar(bins_[:-1], freq, align="edge", width=np.diff(bins_))
     plt.title('PSRN')
     #
-    ax=plt.subplot(gs[ :, 3])
+    ax=plt.subplot(gs[ :, 3:4])
     plt.text(0., 0., full_text, size=10)
     plt.axis('off')    
     #
