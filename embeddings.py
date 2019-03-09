@@ -9,12 +9,12 @@ def load_glove_file(glove_path):
     words = []
     idx = 0
     word2idx = {}
-    vectors = bcolz.carray(np.zeros(1), rootdir=f'{glove_path}/6B.50.dat',
+    vectors = bcolz.carray(np.zeros(1), rootdir='{}/6B.50.dat'.format(glove_path),
                            mode='w')
     
-    total_lines = sum(1 for line in open(f'{glove_path}/glove.6B.50d.txt',
+    total_lines = sum(1 for line in open('{}/glove.6B.50d.txt'.format(glove_path),
                                          'rb'))
-    with open(f'{glove_path}/glove.6B.50d.txt', 'rb') as f:
+    with open('{}/glove.6B.50d.txt'.format(glove_path), 'rb') as f:
         progress_bar = tqdm(total=total_lines)
         for l in f:
             progress_bar.update(1)
@@ -26,10 +26,10 @@ def load_glove_file(glove_path):
             vect = np.array(line[1:]).astype(np.float)
             vectors.append(vect)
     progress_bar.close()
-    vectors = bcolz.carray(vectors[1:].reshape((400000, 50)), rootdir=f'{glove_path}/6B.50.dat', mode='w')
+    vectors = bcolz.carray(vectors[1:].reshape((400000, 50)), rootdir='{}/6B.50.dat'.format(glove_path), mode='w')
     vectors.flush()
-    pickle.dump(words, open(f'{glove_path}/6B.50_words.pkl', 'wb'))
-    pickle.dump(word2idx, open(f'{glove_path}/6B.50_idx.pkl', 'wb'))
+    pickle.dump(words, open('{}/6B.50_words.pkl'.format(glove_path), 'wb'))
+    pickle.dump(word2idx, open('{}/6B.50_idx.pkl'.format(glove_path), 'wb'))
 
 
 class glove():
