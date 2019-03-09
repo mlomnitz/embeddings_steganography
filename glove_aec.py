@@ -213,4 +213,4 @@ class encoder_decoder():
             #
             fig = make_fig(cover[0].cpu(), container[0].cpu(), secret[0].cpu(),
                            revealed[0].cpu(), pix_error, psnr, reco_message)
-            fig.savefig('{}/{}.png'.format(save_path, idx))
+            fig.savefig('{}/frame{}.png'.format(save_path, idx))
