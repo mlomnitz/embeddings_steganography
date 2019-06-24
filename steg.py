@@ -42,8 +42,16 @@ def run_encode(n_words, n_images, tag, input_mode):
     chpt = torch.load('{}/weights/embedding_{}_word_encoder_{}.pth.tar'
                       .format(local_path, n_words, tag))
     generator.load_state_dict(chpt['state_dict'])
-    aec = encoder_decoder(encoder=generator)
+    #
+    classifier = decoder(n_words=args.n_words)
+    chpt = torch.load('{}/weights/embedding_{}_word_decoder_{}.pth.tar'
+                      .format(local_path, n_words, tag))
+    classifier.load_state_dict(chpt['state_dict'])
+    #
+    aec = encoder_decoder(encoder=generator, decoder=classifier)
     aec.encode_message(message=message, n_images=n_images)
+    aec.decode_message(gif='./Example/message.png', save_path=None)
+    print('Decoded message: \n{}'.format(message))
 
 
 def run_decode(n_words, tag):
@@ -53,7 +61,9 @@ def run_decode(n_words, tag):
                       .format(local_path, n_words, tag))
     classifier.load_state_dict(chpt['state_dict'])
     aec = encoder_decoder(decoder=classifier)
-    aec.decode_message(gif=message_gif, save_path='./Example/message.txt')
+    message = aec.decode_message(gif=message_gif,
+                                 save_path='./Example/message.txt')
+    print('Decoded message: \n{}'.format(message))
 
 
 if __name__ == '__main__':

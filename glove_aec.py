@@ -186,6 +186,8 @@ class encoder_decoder():
             message += ' '+this_frame
         progress_bar.close()
         shutil.rmtree(temp_dir)
+        if save_path is None:
+            return message
         text_file = open(save_path, 'w')
         print('Saving decoded message to {}'.format(save_path))
         text_file.write(message)
