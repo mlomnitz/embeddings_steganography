@@ -100,8 +100,13 @@ class encoder_decoder():
     #
     def convert_message(self, message='', n_images=0):
         w_list = re.findall(r"[\w']+|[.,!?;]", message)
-        assert (len(w_list)-1)//self.n_words + \
-            1 < n_images, 'Current message is longer than available images'
+        needed_images = (len(w_list)-1)//self.n_words + 1
+        if n_images == 0:
+            n_images = needed_images
+
+        assert needed_images <= n_images and n_images < len(self.coverloader), 'Current message is longer\
+ than available images'
+
         pad_length = self.n_words * \
             max((len(w_list)-1)//self.n_words+1, n_images)-len(w_list)
         converted = []
