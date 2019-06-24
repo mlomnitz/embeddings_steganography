@@ -7,7 +7,7 @@ from glove_aec import encoder_decoder
 from definitions import local_path
 
 parser = argparse.ArgumentParser(description='Load encoder and/or decoder')
-parser.add_argument('--n_words', dest='n_words', default=5, type=int,
+parser.add_argument('--n_words', dest='n_words', default=20, type=int,
                     help='Number of words/frame to embed')
 parser.add_argument('--deconv', dest='upsample', action='store_false',
                     help='Set model to use deconv instead of upsample blocks')
@@ -21,19 +21,29 @@ parser.add_argument('--source_fig', dest='source_gif',
                     default='GIF_source', help='Location of source gif')
 parser.add_argument('--mode', dest='mode', choices=['E', 'D', 'B'],
                     help='Running mode: encode(E), decode(D) or benchmark(B)')
+parser.add_argument('--i_mode', dest='i_mode', default='K', choices=['K', 'F'],
+                    help='Select input mode for secret message \
+(Keyboard or File)')
+parser.add_argument('--n_images', dest='n_images', default=0, type=int,
+                    help='Specifies the number of images to use. Default will\
+ use minimum needed.')
 
 
-def run_encode(n_words, tag):
-    message_file = input('Input message file: ')
-    with open(message_file) as file:
-        message = file.read().replace('\n', '').lower()
+def run_encode(n_words, n_images, tag, input_mode):
+    #
+    if input_mode == 'K':
+        message = input('Input secret message: ').lower()
+    else:
+        message_file = input('Input secret message: ')
+        with open(message_file) as file:
+            message = file.read().replace('\n', '').lower()
     #
     generator = encoder(n_words=args.n_words, upsample=args.upsample)
     chpt = torch.load('{}/weights/embedding_{}_word_encoder_{}.pth.tar'
                       .format(local_path, n_words, tag))
     generator.load_state_dict(chpt['state_dict'])
     aec = encoder_decoder(encoder=generator)
-    aec.encode_message(message=message)
+    aec.encode_message(message=message, n_images=n_images)
 
 
 def run_decode(n_words, tag):
@@ -45,19 +55,17 @@ def run_decode(n_words, tag):
     aec = encoder_decoder(decoder=classifier)
     aec.decode_message(gif=message_gif, save_path='./Example/message.txt')
 
-    
+
 if __name__ == '__main__':
     args = parser.parse_args()
     tag = ''
     if args.upsample:
         tag = 'upsample'
     if args.mode == 'E':
-        run_encode(args.n_words, tag)
+        run_encode(args.n_words, args.n_images, tag, args.i_mode)
 
     elif args.mode == 'D':
         run_decode(args.n_words, tag)
-        
+
     elif args.mode == 'B':
         print('Benchmark, still note implemented in this function')
-        
-    
