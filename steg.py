@@ -21,22 +21,16 @@ parser.add_argument('--source_fig', dest='source_gif',
                     default='GIF_source', help='Location of source gif')
 parser.add_argument('--mode', dest='mode', choices=['E', 'D', 'B'],
                     help='Running mode: encode(E), decode(D) or benchmark(B)')
-parser.add_argument('--i_mode', dest='i_mode', default='K', choices=['K', 'F'],
+parser.add_argument('--i_mode', dest='i_mode', default='K', choices=['K', 'S', 'F'],
                     help='Select input mode for secret message \
-(Keyboard or File)')
+                    (Keyboard or  File). Only used if string is not passed')
+parser.add_argument('--message', action="store", default=None, type=str)
 parser.add_argument('--n_images', dest='n_images', default=0, type=int,
                     help='Specifies the number of images to use. Default will\
  use minimum needed.')
 
 
-def run_encode(n_words, n_images, tag, input_mode):
-    #
-    if input_mode == 'K':
-        message = input('Input secret message: ').lower()
-    else:
-        message_file = input('Input secret message: ')
-        with open(message_file) as file:
-            message = file.read().replace('\n', '').lower()
+def run_encode(n_words, n_images, tag, message):
     #
     generator = encoder(n_words=args.n_words, upsample=args.upsample)
     chpt = torch.load('{}/weights/embedding_{}_word_encoder_{}.pth.tar'
@@ -69,10 +63,19 @@ def run_decode(n_words, tag):
 if __name__ == '__main__':
     args = parser.parse_args()
     tag = ''
+    if args.message is not None:
+        message = args.message.lower()
+    elif args.i_mode == 'K':
+        message = input('Input secret message: ').lower()
+    else:
+        message_file = input('Input secret message: ')
+        with open(message_file) as file:
+            message = file.read().replace('\n', '').lower()
+    #
     if args.upsample:
         tag = 'upsample'
     if args.mode == 'E':
-        run_encode(args.n_words, args.n_images, tag, args.i_mode)
+        run_encode(args.n_words, args.n_images, tag, message)
 
     elif args.mode == 'D':
         run_decode(args.n_words, tag)
