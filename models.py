@@ -1,39 +1,107 @@
+#File handling
+import bcolz
+import pickle
+from random import sample
+from collections import Counter
+import re
+import functools
+#Torch
+import torch
 import torch.nn as nn
+import torch 
 import torch.nn.functional as F
 
+class StegEncoderDecoder():
+    def __init__(self, embedding_path='', n_words = 20, encoder_path = None, decoder_path = None, device='cuda'):
+        embeddings = bcolz.open('{}/6B.50.dat'.format(embedding_path))[:]
+        self.vectors = torch.from_numpy(embeddings).float()
+        self.words = pickle.load(open('{}/6B.50_words.pkl'.format(embedding_path), 'rb'))
+        self.word2idx = pickle.load(open('{}/6B.50_idx.pkl'.format(embedding_path), 'rb'))
+        self.vocab_size = len(self.vectors)
+        self.n_words = n_words
+        self.encoder = Encoder(n_words, upsample=True).to(device)
+        self.decoder = Decoder(n_words).to(device)
+        if encoder_path is not None:
+            chpt = torch.load(encoder_path)
+            self.encoder.load_state_dict(chpt['state_dict'])
+        if decoder_path is not None:
+            chpt = torch.load(decoder_path)
+            self.decoder.load_state_dict(chpt['state_dict'])
 
-class upsample_block(nn.Module):
-    def __init__(self, in_size, out_size):
-        super(upsample_block, self).__init__()
-        self.upsample_block = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear'),
-            nn.ReflectionPad2d(1),
-            nn.Conv2d(in_size, out_size, kernel_size=3, stride=1, padding=0)
-        )
-
-    def forward(self, x):
-        return self.upsample_block(x)
-
-
-class deconv_block(nn.Module):
-    def __init__(self, in_size, inter_size, out_size):
-        super(deconv_block, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_size, inter_size, kernel_size=3, padding=1, stride=1),
-            nn.ReLU(),
-        )
-        self.deconv = nn.ConvTranspose2d(inter_size, out_size, kernel_size=3,
-                                         stride=2, padding=1, output_padding=1)
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.deconv(x)
-        return x
+    def message_2_labels(self, message='', replace_unknown = False):
+        error_flag = False
+        message_tokens = re.findall(r"[\w']+|[.,!?;]", message)
+        pad_length = self.n_words*((len(message_tokens)-1)//self.n_words+1)-len(message_tokens)
+        converted_tokens = []      
+        for token in message_tokens:
+            try:
+                converted_tokens += [self.word2idx[token]]
+            except KeyError:
+                if replace_unknown == True:
+                    converted_tokens += [self.word2idx['blank']]
+                else:
+                    print('Token for {} does not exist. Please replace token in message and retry.'.format(token))
+        if pad_length > 0:
+            pad_sequence = [self.word2idx['blank']]*pad_length
+            self.words[self.word2idx['blank']] = ''
+            insert_locations = sample(range(len(converted_tokens) + len(pad_sequence)), len(pad_sequence))
+            inserts = dict(zip(insert_locations, pad_sequence))
+            message_iterator = iter(converted_tokens)
+            converted_tokens[:] = [inserts[pos] if pos in inserts else next(message_iterator) for pos in range(len(converted_tokens) + len(pad_sequence))]
+            
+        return converted_tokens
     
+    def label_2_embeddings(self, labels, embedding_size=50):
+        embedding = torch.FloatTensor(labels.shape[0], embedding_size).zero_()
+        for idx, label in enumerate(labels):
+            embedding[idx] = self.vectors[label]
 
-class encoder(nn.Module):
+        return embedding
+
+class Hnet():
+    def __init__(self, Hnet_path = None, device = 'cuda'):
+        self.model = UnetGenerator(input_nc=6, output_nc=3, num_downs=7,
+                                  output_function=nn.Sigmoid).to(device)
+        if Hnet_path is not None:
+            self.model.load_state_dict(torch.load(Hnet_path))
+            self.model.eval()
+            
+    def hide_message(self, encoder, embedding, cover_img, device):
+        with torch.set_grad_enabled(False):
+            message_image = encoder(embedding.to(device))
+            cat_image = torch.cat([cover_img.to(device), message_image], dim=1)
+            return cover_img, message_image, self.model(cat_image)
+        
+class Rnet():
+    def __init__(self, Rnet_path = None, device = 'cuda'):
+        self.model = RevealNet(output_function=nn.Sigmoid).to(device)
+        if Rnet_path is not None:
+            self.model.load_state_dict(torch.load(Rnet_path))
+            self.model.eval()
+            
+    def recover_message(self, Rnet, encoder_decoder, image, device='cuda'):
+        with torch.set_grad_enabled(False):
+            encoder_decoder.decoder.eval()
+            message = []
+            image_tensor = image.to(device)
+            encoding = Rnet(image_tensor)
+            recovered_message = encoder_decoder.decoder(encoding)
+            recovered_message = recovered_message.reshape((20,50))
+            for i_word in range(20):
+                embedding = recovered_message[i_word].reshape((1, 50))
+                predicted = nn.CosineSimilarity()(encoder_decoder.vectors.to(device), embedding)
+                predicted = encoder_decoder.words[predicted.argmax()]
+                message.append(predicted)
+            return " ".join(message)
+        
+       
+        
+
+####BASIC CONSTRUCTION CLASSES FOR ABOVE  
+
+class Encoder(nn.Module):
     def __init__(self, n_words=1, embeddings_dim=50, upsample=False):
-        super(encoder, self).__init__()
+        super(Encoder, self).__init__()
         self.n_words = n_words
         self.embeddings_dim = embeddings_dim
         # Model sizes
@@ -44,11 +112,11 @@ class encoder(nn.Module):
         self.down_path = nn.ModuleList()
         if upsample:
             for idx in range(len(in_sizes)):
-                self.down_path.append(upsample_block(in_sizes[idx],
+                self.down_path.append(UpsampleBlock(in_sizes[idx],
                                                      out_sizes[idx]))
         else:
             for idx in range(len(in_sizes)):
-                self.down_path.append(deconv_block(in_sizes[idx],
+                self.down_path.append(DeconvBlock(in_sizes[idx],
                                                    inter_sizes[idx],
                                                    out_sizes[idx]))
         #
@@ -61,11 +129,59 @@ class encoder(nn.Module):
         for layer in self.down_path:
             x = layer(x)
         return F.sigmoid(x)
+    
+class Decoder(nn.Module):
+    def __init__(self, n_words=1, embeddings_dim=50):
+        super(Decoder, self).__init__()
+        self.n_words = n_words
+        # Model sizes
+        insize = [3, 64, 128, 256]
+        outsize = [64, 128, 256, 256]
+        #
+        self.up_path = nn.ModuleList()
+        for idx in range(len(insize)):
+            self.up_path.append(ConvBlock(in_channels=insize[idx],
+                                           out_channels=outsize[idx]))
+        self.fc = nn.Linear(65536, embeddings_dim*self.n_words)
 
+    def forward(self, x):
+        for layer in self.up_path:
+            x = layer(x)
+        x = x.view(x.shape[0], -1)
+        x = self.fc(x)
+        x = x.view(x.shape[0]*self.n_words, -1)
+        return x
+        
+class UpsampleBlock(nn.Module):
+    def __init__(self, in_size, out_size):
+        super(UpsampleBlock, self).__init__()
+        self.upsample_block = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear'),
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(in_size, out_size, kernel_size=3, stride=1, padding=0)
+        )
 
-class conv_block(nn.Module):
+    def forward(self, x):
+        return self.upsample_block(x)
+
+class DeconvBlock(nn.Module):
+    def __init__(self, in_size, inter_size, out_size):
+        super(DeconvBlock, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_size, inter_size, kernel_size=3, padding=1, stride=1),
+            nn.ReLU(),
+        )
+        self.deconv = nn.ConvTranspose2d(inter_size, out_size, kernel_size=3,
+                                         stride=2, padding=1, output_padding=1)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.deconv(x)
+        return x        
+        
+class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
-        super(conv_block, self).__init__()
+        super(ConvBlock, self).__init__()
         self.block = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
                       kernel_size=3, stride=1, padding=1),
@@ -77,26 +193,107 @@ class conv_block(nn.Module):
         
     def forward(self, x):
         return self.block(x)
+        
+class UnetGenerator(nn.Module):
+    """
+     Adapted from https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
 
-    
-class decoder(nn.Module):
-    def __init__(self, n_words=1, embeddings_dim=50):
-        super(decoder, self).__init__()
-        self.n_words = n_words
-        # Model sizes
-        insize = [3, 64, 128, 256]
-        outsize = [64, 128, 256, 256]
-        #
-        self.up_path = nn.ModuleList()
-        for idx in range(len(insize)):
-            self.up_path.append(conv_block(in_channels=insize[idx],
-                                           out_channels=outsize[idx]))
-        self.fc = nn.Linear(65536, embeddings_dim*self.n_words)
+    """
+    def __init__(self, input_nc, output_nc, num_downs, ngf=64,
+                 norm_layer=nn.BatchNorm2d, use_dropout=False, output_function=nn.Sigmoid):
+        super(UnetGenerator, self).__init__()
+        unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
+        for i in range(num_downs - 5):
+            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+        unet_block = UnetSkipConnectionBlock(ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer, output_function=output_function)
+
+        self.model = unet_block
+
+    def forward(self, input):
+        return self.model(input)
+
+class UnetSkipConnectionBlock(nn.Module):
+    def __init__(self, outer_nc, inner_nc, input_nc=None,submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False, output_function=nn.Sigmoid):
+        super(UnetSkipConnectionBlock, self).__init__()
+        self.outermost = outermost
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+        if input_nc is None:
+            input_nc = outer_nc
+        downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
+                             stride=2, padding=1, bias=use_bias)
+        downrelu = nn.LeakyReLU(0.2, True)
+        downnorm = norm_layer(inner_nc)
+        uprelu = nn.ReLU(True)
+        upnorm = norm_layer(outer_nc)
+
+        if outermost:
+            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
+                                        kernel_size=4, stride=2,
+                                        padding=1)
+            down = [downconv]
+            if output_function == nn.Tanh:
+                up = [uprelu, upconv, nn.Tanh()]
+            else:
+                up = [uprelu, upconv, nn.Sigmoid()]
+            model = down + [submodule] + up
+        elif innermost:
+            upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
+                                        kernel_size=4, stride=2,
+                                        padding=1, bias=use_bias)
+            down = [downrelu, downconv]
+            up = [uprelu, upconv, upnorm]
+            model = down + up
+        else:
+            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
+                                        kernel_size=4, stride=2,
+                                        padding=1, bias=use_bias)
+            down = [downrelu, downconv, downnorm]
+            up = [uprelu, upconv, upnorm]
+
+            if use_dropout:
+                model = down + [submodule] + up + [nn.Dropout(0.5)]
+            else:
+                model = down + [submodule] + up
+
+        self.model = nn.Sequential(*model)
 
     def forward(self, x):
-        for layer in self.up_path:
-            x = layer(x)
-        x = x.view(x.shape[0], -1)
-        x = self.fc(x)
-        x = x.view(x.shape[0]*self.n_words, -1)
-        return x
+        if self.outermost:
+            return self.model(x)
+        else:
+            return torch.cat([x, self.model(x)], 1)   
+        
+class RevealNet(nn.Module):
+    def __init__(self, nc=3, nhf=64, output_function=nn.Sigmoid):
+        super(RevealNet, self).__init__()
+        # input is (3) x 256 x 256
+        self.main = nn.Sequential(
+            nn.Conv2d(nc, nhf, 3, 1, 1),
+            nn.BatchNorm2d(nhf),
+            nn.ReLU(True),
+            nn.Conv2d(nhf, nhf * 2, 3, 1, 1),
+            nn.BatchNorm2d(nhf*2),
+            nn.ReLU(True),
+            nn.Conv2d(nhf * 2, nhf * 4, 3, 1, 1),
+            nn.BatchNorm2d(nhf*4),
+            nn.ReLU(True),
+            nn.Conv2d(nhf * 4, nhf * 2, 3, 1, 1),
+            nn.BatchNorm2d(nhf*2),
+            nn.ReLU(True),
+            nn.Conv2d(nhf * 2, nhf, 3, 1, 1),
+            nn.BatchNorm2d(nhf),
+            nn.ReLU(True),
+            nn.Conv2d(nhf, nc, 3, 1, 1),
+            output_function()
+        )
+
+    def forward(self, input):
+        output=self.main(input)
+        return output
+
