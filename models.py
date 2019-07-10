@@ -75,11 +75,13 @@ class Hnet():
         if Hnet_path is not None:
             self.model.load_state_dict(torch.load(Hnet_path))
             self.model.eval()
+        self.device = device
 
-    def hide_message(self, encoder, embedding, cover_img, device):
+    def hide_message(self, encoder, embedding, cover_img):
         with torch.set_grad_enabled(False):
-            message_image = encoder(embedding.to(device))
-            cat_image = torch.cat([cover_img.to(device), message_image], dim=1)
+            message_image = encoder(embedding.to(self.device))
+            cat_image = torch.cat(
+                [cover_img.to(self.device), message_image], dim=1)
             return cover_img, message_image, self.model(cat_image)
 
 
@@ -89,18 +91,20 @@ class Rnet():
         if Rnet_path is not None:
             self.model.load_state_dict(torch.load(Rnet_path))
             self.model.eval()
+        self.device = device
 
-    def recover_message(self, Rnet, encoder_decoder, image, device='cuda'):
+    def recover_message(self, Rnet, encoder_decoder, image):
         with torch.set_grad_enabled(False):
             encoder_decoder.decoder.eval()
             message = []
-            image_tensor = image.to(device)
+            image_tensor = image.to(self.device)
             encoding = Rnet(image_tensor)
             recovered_message = encoder_decoder.decoder(encoding)
             recovered_message = recovered_message.reshape((20, 50))
             for i_word in range(20):
                 embedding = recovered_message[i_word].reshape((1, 50))
-                predicted = nn.CosineSimilarity()(encoder_decoder.vectors.to(device), embedding)
+                predicted = nn.CosineSimilarity()(
+                    encoder_decoder.vectors.to(self.device), embedding)
                 predicted = encoder_decoder.words[predicted.argmax()]
                 message.append(predicted)
             return " ".join(message)
