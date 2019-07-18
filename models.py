@@ -31,6 +31,7 @@ class StegEncoderDecoder():
     def message_2_labels(self, message='', replace_unknown = False):
         error_flag = False
         message_tokens = re.findall(r"[\w']+|[.,!?;]", message)
+        
         pad_length = self.n_words*((len(message_tokens)-1)//self.n_words+1)-len(message_tokens)
         converted_tokens = []      
         for token in message_tokens:
@@ -71,7 +72,7 @@ class Hnet():
             message_image = encoder(embedding.to(device))
             cat_image = torch.cat([cover_img.to(device), message_image], dim=1)
             return cover_img, message_image, self.model(cat_image)
-        
+                
 class Rnet():
     def __init__(self, Rnet_path = None, device = 'cuda'):
         self.model = RevealNet(output_function=nn.Sigmoid).to(device)
