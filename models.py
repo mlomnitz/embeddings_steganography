@@ -34,9 +34,11 @@ class StegEncoderDecoder():
     def message_2_labels(self, message='', replace_unknown=False):
         error_flag = False
         message_tokens = re.findall(r"[\w']+|[.,!?;]", message)
+
         pad_length = self.n_words * \
             ((len(message_tokens)-1)//self.n_words+1)-len(message_tokens)
         converted_tokens = []
+
         for token in message_tokens:
             try:
                 converted_tokens += [self.word2idx[token]]
