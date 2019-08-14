@@ -13,7 +13,7 @@ import torch.nn.functional as F
 
 class StegEncoderDecoder():
     def __init__(self, embedding_path='', n_words=20, encoder_path=None,
-                 decoder_path=None, device):
+                 decoder_path=None, device=torch.device('cpu')):
         """ Encoder and Decoder object
         Parameters
         ----------
@@ -115,7 +115,7 @@ class StegEncoderDecoder():
 
 
 class Hnet():
-    def __init__(self, Hnet_path=None, device):
+    def __init__(self, Hnet_path=None, device=torch.device('cpu')):
         """ Torch model used to hide one image in another
         Parameters
         ----------
@@ -162,7 +162,7 @@ class Hnet():
 
 
 class Rnet():
-    def __init__(self, Rnet_path=None, device):
+    def __init__(self, Rnet_path=None, device=torch.device('cpu')):
         """ Recovery network used to reveal hidden images
         Parameters
         ----------

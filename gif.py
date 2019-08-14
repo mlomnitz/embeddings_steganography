@@ -119,7 +119,7 @@ class GIFDataset(Dataset):
         return len(self.dataset)  
 
    
-def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device):
+def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device=torch.device('cpu')):
     """ Encodes secret message into a gif
     Parameters
     ----------
@@ -154,7 +154,8 @@ def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device):
     frames_to_gif()
     
    
-def decode_gif(reveal_net, encoder_decoder, gif_path='', device):
+def decode_gif(reveal_net, encoder_decoder, gif_path='',
+               device=torch.device('cpu')):
     """ Decodes a gif containing secret messages
     Parameters
     ----------
