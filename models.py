@@ -14,6 +14,24 @@ import torch.nn.functional as F
 class StegEncoderDecoder():
     def __init__(self, embedding_path='', n_words=20, encoder_path=None,
                  decoder_path=None, device='cuda'):
+        """ Encoder and Decoder object
+        Parameters
+        ----------
+        embeddings_path : str
+            Path to load the embeddings dictionary for vocabulary
+        n_words : int
+            Number of words to embed in each message.  Must match loaded model
+            architecture
+        encoder_path : str
+            Path to encoder model weights
+        decoder_path : str
+            Path to decoder model weights
+        device : str
+            Device to run on
+
+        Returns
+        -------
+        """
         embeddings = bcolz.open('{}/6B.50.dat'.format(embedding_path))[:]
         self.vectors = torch.from_numpy(embeddings).float()
         self.words = pickle.load(
@@ -32,7 +50,20 @@ class StegEncoderDecoder():
             self.decoder.load_state_dict(chpt['state_dict'])
 
     def message_2_labels(self, message='', replace_unknown=False):
-        error_flag = False
+        """ Converts message into a list of tokens of their associated
+        embeddings indices
+        Parameters
+        ----------
+        messagge : str
+            Message to convert
+        replace_unkown : bool
+            Swith to either replace words outside vocabulary or quit
+
+        Returns
+        -------    
+        converted_tokens : list(int)
+            List of tokens representing message
+        """  
         message_tokens = re.findall(r"[\w']+|[.,!?;]", message)
 
         pad_length = self.n_words * \
@@ -43,7 +74,7 @@ class StegEncoderDecoder():
             try:
                 converted_tokens += [self.word2idx[token]]
             except KeyError:
-                if replace_unknown == True:
+                if replace_unknown is True:
                     converted_tokens += [self.word2idx['blank']]
                 else:
                     print(
@@ -63,6 +94,19 @@ class StegEncoderDecoder():
         return converted_tokens
 
     def label_2_embeddings(self, labels, embedding_size=50):
+        """ Converts a list of tokens int embeddings
+        Parameters
+        ----------
+        labels : list(int)
+            List of tokens associating words to embeddings
+        embedding_size : int
+            Length of each embedding
+
+        Returns
+        -------    
+        embedding : torch.tensor
+            Torch tensor containg the batch of embeddings
+        """  
         embedding = torch.FloatTensor(labels.shape[0], embedding_size).zero_()
         for idx, label in enumerate(labels):
             embedding[idx] = self.vectors[label]
@@ -72,6 +116,17 @@ class StegEncoderDecoder():
 
 class Hnet():
     def __init__(self, Hnet_path=None, device='cuda'):
+        """ Torch model used to hide one image in another
+        Parameters
+        ----------
+        Hnet_path : str
+            Path to the hidding net weights
+        device : str
+            Device to run processes
+
+        Returns
+        -------    
+        """  
         self.model = UnetGenerator(input_nc=6, output_nc=3, num_downs=7,
                                    output_function=nn.Sigmoid).to(device)
         if Hnet_path is not None:
@@ -80,6 +135,25 @@ class Hnet():
         self.device = device
 
     def hide_message(self, encoder, embedding, cover_img):
+        """ Hide message embeddings in a cover image
+        Parameters
+        ----------
+        encoder : torch.nn.Module
+            Torch encoder module
+        embedding : torch.tensor
+            Torch embeddings tensor
+        cover_img : torch.tensor
+            Cover image tensor
+
+        Returns
+        -------    
+        cover_img : torch.tensor
+            Original torch tensor for the cover image
+        message_image : torch.tensor
+            Encoded message image
+        container_img : torch.tensor
+            Container image with hidden message
+        """  
         with torch.set_grad_enabled(False):
             message_image = encoder(embedding.to(self.device))
             cat_image = torch.cat(
@@ -89,6 +163,16 @@ class Hnet():
 
 class Rnet():
     def __init__(self, Rnet_path=None, device='cuda'):
+        """ Recovery network used to reveal hidden images
+        Parameters
+        ----------
+        Rnet_path : str
+            Path to the recovery network model weights
+        device : str
+            Device to run processes
+        Returns
+        -------    
+        """  
         self.model = RevealNet(output_function=nn.Sigmoid).to(device)
         if Rnet_path is not None:
             self.model.load_state_dict(torch.load(Rnet_path))
@@ -96,6 +180,21 @@ class Rnet():
         self.device = device
 
     def recover_message(self, Rnet, encoder_decoder, image):
+        """ Recovers and decodes a message from a container image
+        Parameters
+        ----------
+        Rnet : torch.nn.Module
+            Torch model for image recovery
+        encoder_decoder : torch.nn.Module
+            Torch model to decode message image back into embeddings
+        image : torch.tensor
+            Container image
+
+        Returns
+        -------    
+        message : str
+            Revealed and decoded message
+        """  
         with torch.set_grad_enabled(False):
             encoder_decoder.decoder.eval()
             message = []
@@ -116,6 +215,19 @@ class Rnet():
 
 class Encoder(nn.Module):
     def __init__(self, n_words=1, embeddings_dim=50, upsample=False):
+        """ Network used to encode embeddings into images
+        Parameters
+        ----------
+        n_words : int
+            Number of words per image
+        embeddings_dim : int
+            Dimensions of each embedding
+        upsample : bool
+            Boolean to switch between upsampling layer and transpose
+            convolution
+        Returns
+        -------    
+        """  
         super(Encoder, self).__init__()
         self.n_words = n_words
         self.embeddings_dim = embeddings_dim
@@ -138,6 +250,17 @@ class Encoder(nn.Module):
         self.fc = nn.Linear(embeddings_dim*n_words, 65536)
 
     def forward(self, x):
+        """ Forward pass for encoder 
+        Parameters
+        ----------
+        x : torch.tensor
+            Tensor to process
+
+        Returns
+        -------    
+        prediction : torch.tensor
+            Prediction torch tensor
+        """  
         x = x.view(-1, self.embeddings_dim*self.n_words)
         x = self.fc(x)
         x = x.reshape(x.shape[0], 256, 16, 16)
@@ -148,6 +271,17 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, n_words=1, embeddings_dim=50):
+        """ Torch model used for decoding messages from images
+        Parameters
+        ----------
+        n_words : int
+            Number of words per message
+        emvedding_dim : int
+            Dimension of embeddings
+
+        Returns
+        -------    
+        """  
         super(Decoder, self).__init__()
         self.n_words = n_words
         # Model sizes
@@ -161,6 +295,17 @@ class Decoder(nn.Module):
         self.fc = nn.Linear(65536, embeddings_dim*self.n_words)
 
     def forward(self, x):
+        """ Forward pass through model
+        Parameters
+        ----------
+        x : torch.tensor
+            Input torch tensor images (B, 3, H, W)
+
+        Returns
+        -------    
+        embeddings : torch.tensor
+            Decoded embeddings tensor (B*n_words, embeddings_dim) 
+        """  
         for layer in self.up_path:
             x = layer(x)
         x = x.view(x.shape[0], -1)
@@ -171,6 +316,17 @@ class Decoder(nn.Module):
 
 class UpsampleBlock(nn.Module):
     def __init__(self, in_size, out_size):
+        """ Upsample block for encoding
+        Parameters
+        ----------
+        in_size : int
+            Input size for convolution filters
+        out_size : int
+            Output nunber of filters for convolution
+
+        Returns
+        -------    
+        """  
         super(UpsampleBlock, self).__init__()
         self.upsample_block = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear'),
@@ -179,11 +335,35 @@ class UpsampleBlock(nn.Module):
         )
 
     def forward(self, x):
+        """ Forward pass
+        Parameters
+        ----------
+        x : torch.tensor
+            Input tensor to process (B, input_size, H, W)
+
+        Returns
+        -------    
+        x : torch.tensor
+            Processed tensor (B, output_size, 2*H, 2*W)
+        """  
         return self.upsample_block(x)
 
 
 class DeconvBlock(nn.Module):
     def __init__(self, in_size, inter_size, out_size):
+        """ Transpose convolution block for encoder
+        Parameters
+        ----------
+        in_size : int
+            Input size for convolution filters
+        inter_size : int
+            Number of filters for intermediate convolution
+        out_size : int
+            Output nunber of filters for convolution
+
+        Returns
+        -------    
+        """  
         super(DeconvBlock, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_size, inter_size, kernel_size=3, padding=1, stride=1),
@@ -193,6 +373,17 @@ class DeconvBlock(nn.Module):
                                          stride=2, padding=1, output_padding=1)
 
     def forward(self, x):
+        """ Forward pass
+        Parameters
+        ----------
+        x : torch.tensor
+            Input tensor to process (B, input_size, H, W)
+
+        Returns
+        -------    
+        x : torch.tensor
+            Processed tensor (B, output_size, 2*H, 2*W)
+        """  
         x = self.conv(x)
         x = self.deconv(x)
         return x
@@ -200,6 +391,17 @@ class DeconvBlock(nn.Module):
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
+        """ Convolution block for decoder
+        Parameters
+        ----------
+        in_size : int
+            Input size for convolution filters
+        out_size : int
+            Output nunber of filters for convolution
+
+        Returns
+        -------   
+        """  
         super(ConvBlock, self).__init__()
         self.block = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
@@ -211,17 +413,45 @@ class ConvBlock(nn.Module):
         )
 
     def forward(self, x):
+        """ Forward pass
+        Parameters
+        ----------
+        x : torch.tensor
+            Input tensor to process (B, input_size, H, W)
+
+        Returns
+        -------    
+        x : torch.tensor
+            Processed tensor (B, output_size, H/2, W/2)
+        """          
         return self.block(x)
 
 
 class UnetGenerator(nn.Module):
-    """
-     Adapted from https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
-
-    """
-
     def __init__(self, input_nc, output_nc, num_downs, ngf=64,
-                 norm_layer=nn.BatchNorm2d, use_dropout=False, output_function=nn.Sigmoid):
+                 norm_layer=nn.BatchNorm2d, use_dropout=False,
+                 output_function=nn.Sigmoid):
+        """ Unet Model definition for hidding and recovery networks.  Adapted 
+        from https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
+        Parameters
+        ----------
+        input_nc : int
+            Input number of channels
+        output_nc : int
+            Output number of channels
+        num_downs : int
+            Number of down and up blocks
+        ngf : int
+            Number of in and out filters in the unet blocks
+        norm_layer : torch.nn.Module
+           Torch nomralization layer to use in blocks
+        use_droput : bool
+            Boolean value to turn dropout on or off
+        output_function : torch.nn.Module
+            Output activation function for last layer
+        Returns
+        -------    
+        """  
         super(UnetGenerator, self).__init__()
         unet_block = UnetSkipConnectionBlock(
             ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
@@ -240,11 +470,45 @@ class UnetGenerator(nn.Module):
         self.model = unet_block
 
     def forward(self, input):
+        """ Forward pass
+        Parameters
+        ----------
+        x : torch.tensor
+            Input torch tensors (B, input_nc, H, W)
+        Returns
+        -------    
+        x : torch.tensor
+            Processed tensor size (B, output_nc, H, W)
+        """  
         return self.model(input)
 
 
 class UnetSkipConnectionBlock(nn.Module):
     def __init__(self, outer_nc, inner_nc, input_nc=None, submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False, output_function=nn.Sigmoid):
+        """ Basic Unet skip blocks
+        Parameters
+        ----------
+        outer_nc : int
+            Outer most number of channels
+        inner_nc : int
+            Inner number of channels
+        input_nc : int
+            Input number of channels
+        submodule : torch.nn.Module
+            Nested submodule in model
+        outermost : bool
+            Outermost block?  Used to specify if skip connections and such
+        innermost : bool
+            Innermost block? Used to specify if skip connections and such
+        norm_layer : torch.nn.Module
+            Normalization layer to use in block
+        use_dropout : bool
+            Turn dropout on or off
+        output_function : torch.nn.Module
+            Activation function to apply on output
+        Returns
+        -------    
+        """  
         super(UnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
         if type(norm_layer) == functools.partial:
@@ -292,6 +556,17 @@ class UnetSkipConnectionBlock(nn.Module):
         self.model = nn.Sequential(*model)
 
     def forward(self, x):
+        """ Forward pass
+        Parameters
+        ----------
+        x : torch.tensor
+            Tensor to process
+
+        Returns
+        -------    
+        x : torch.tensor
+            Processed tensor
+        """   
         if self.outermost:
             return self.model(x)
         else:
@@ -300,6 +575,19 @@ class UnetSkipConnectionBlock(nn.Module):
 
 class RevealNet(nn.Module):
     def __init__(self, nc=3, nhf=64, output_function=nn.Sigmoid):
+        """ Reaveal network definitio
+        Parameters
+        ----------
+        nc : int
+            Number of channles for output and input
+        nhf : int
+            Used to define the number of filters in intermediate steps
+        output_function : torch.nn.Module
+            Activation function to apply on output
+
+        Returns
+        -------    
+        """   
         super(RevealNet, self).__init__()
         # input is (3) x 256 x 256
         self.main = nn.Sequential(
@@ -323,5 +611,15 @@ class RevealNet(nn.Module):
         )
 
     def forward(self, input):
+        """ Forward pass
+        Parameters
+        ----------
+        input : torch.tensor
+            Input tensor to process size (B, 3, H, W)
+
+        Returns
+        -------    
+        output : torch.tensor (B, 3, H, W)
+        """   
         output = self.main(input)
         return output
