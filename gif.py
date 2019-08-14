@@ -119,7 +119,7 @@ class GIFDataset(Dataset):
         return len(self.dataset)  
 
    
-def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device='cuda'):
+def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device):
     """ Encodes secret message into a gif
     Parameters
     ----------
@@ -131,7 +131,7 @@ def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device='cuda'):
         Torch models for encoding and decoding messages
     embeddigns : torch.tensor
         Tensor containing embeddings representing the message to hide
-    device : str
+    device : torch.device
         Device to run the processes on
 
     Returns
@@ -154,7 +154,7 @@ def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device='cuda'):
     frames_to_gif()
     
    
-def decode_gif(reveal_net, encoder_decoder, gif_path='', device='cuda'):
+def decode_gif(reveal_net, encoder_decoder, gif_path='', device):
     """ Decodes a gif containing secret messages
     Parameters
     ----------
@@ -164,7 +164,7 @@ def decode_gif(reveal_net, encoder_decoder, gif_path='', device='cuda'):
         Torch models for encoding and decoding messages
     gif_path : str
         Path to gif to decode
-    device : str
+    device : torch.device
         Device to run processes
 
     Returns
