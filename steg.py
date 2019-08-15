@@ -34,6 +34,27 @@ parser.add_argument('--n_images', dest='n_images', default=0, type=int,
 
 def run_encode(encoder_decoder, hnet, rnet, source_gif, message, device,
                validate=True):
+    """ Function call to encode messages in an image and hide them
+    Parameters
+    ----------
+    encoder_decoder : StegEncoderDecoder
+        Encoder-Decoder imported from models
+    hnet : HiddingNet
+        Hidding Unet imported from models
+    rnet : RecoveryNet
+        Recovery network imported from models
+    source_gif : str
+        Path to source gif to be used for cover
+    message : str
+        Message to encode and hide
+    device : torch.device
+        Device used to process the data
+    validate : bool
+        Swith to turn message validation on/off.  If true will decode the
+        message and display
+    Returns
+    -------
+    """
     #
     print('Processing cover frames: {}'.format(source_gif))
     gif.process_gif(source_gif)
@@ -63,6 +84,20 @@ def run_encode(encoder_decoder, hnet, rnet, source_gif, message, device,
 
 
 def run_decode(encoder_decoder, rnet, device):
+    """ Function call to decode message hidden in container gif. Displays to
+    screen and saves to file.
+    Parameters
+    ----------
+    encoder_decoder : StegEncoderDecoder
+        Encoder-Decoder imported from models
+    rnet : RecoveryNet
+        Recovery network imported from model
+    device : torch.device
+        Device to run the processes on
+
+    Returns
+    -------
+    """
     message_gif = input('Input gif file: ')
     reco_message = gif.decode_gif(reveal_net=rnet,
                                   encoder_decoder=encoder_decoder,
@@ -80,7 +115,8 @@ if __name__ == '__main__':
     tag = ''
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print('Loading models ...')
-    encoder_decoder = models.StegEncoderDecoder(embedding_path=d.embeddings, 
+    encoder_decoder = models.StegEncoderDecoder(embedding_path=d.embeddings,
+                                                n_words=args.n_words,
                                                 encoder_path=d.encoder,
                                                 decoder_path=d.decoder,
                                                 device=device)
@@ -99,11 +135,11 @@ if __name__ == '__main__':
     if args.upsample:
         tag = 'upsample'
     if args.mode == 'E':
-        print("n_words: {}, n_images: {}, tag: {}, message: {}".format(args.n_words, args.n_images, tag, message))
-        run_encode(args.n_words, args.n_images, tag, message)
+        run_encode(encoder_decoder=encoder_decoder, hnet=hnet, rnet=rnet,
+                   source_gif=args.source_gif, message=message, device=device)
 
     elif args.mode == 'D':
-        run_decode(args.n_words, tag)
+        run_decode(encoder_decoder=encoder_decoder, rnet=rnet, device=device)
 
     elif args.mode == 'B':
         print('Benchmark, still note implemented in this function')
