@@ -68,7 +68,7 @@ def run_encode(encoder_decoder, hnet, rnet, source_gif, message, device,
                    encoder_decoder=encoder_decoder, embeddings=embeddings,
                    device=device)
     # clean-up
-    files = glob.glob('./gif/*')
+    files = glob.glob('./gif/*') + glob.glob('./container_gif/*')
     for f in files:
         os.remove(f)
     #
@@ -99,14 +99,15 @@ def run_decode(encoder_decoder, rnet, device):
     -------
     """
     message_gif = input('Input gif file: ')
+    print('Decoding message...')
     reco_message = gif.decode_gif(reveal_net=rnet,
                                   encoder_decoder=encoder_decoder,
                                   gif_path=message_gif, device=device)
-    files = glob.glob('./container_gif/*')
+    files = glob.glob('./gif/*')
     for f in files:
         os.remove(f)
     print('Decoded message: \n{}'.format(reco_message))
-    with open("message.txt", "w") as text_file:
+    with open("./message.txt", "w") as text_file:
         text_file.write(reco_message)  
 
 
@@ -123,18 +124,18 @@ if __name__ == '__main__':
     rnet = models.Rnet(Rnet_path=d.rnet, device=device)
     hnet = models.Hnet(Hnet_path=d.hnet, device=device)
     #
-    if args.message is not None:
-        message = args.message.lower()
-    elif args.i_mode == 'K':
-        message = input('Input secret message: ').lower()
-    else:
-        message_file = input('Input secret message: ')
-        with open(message_file) as file:
-            message = file.read().replace('\n', '').lower()
-    #
-    if args.upsample:
-        tag = 'upsample'
     if args.mode == 'E':
+        if args.message is not None:
+            message = args.message.lower()
+        elif args.i_mode == 'K':
+            message = input('Input secret message: ').lower()
+        else:
+            message_file = input('Input secret message: ')
+            with open(message_file) as file:
+                message = file.read().replace('\n', '').lower()
+        #
+        if args.upsample:
+            tag = 'upsample'
         run_encode(encoder_decoder=encoder_decoder, hnet=hnet, rnet=rnet,
                    source_gif=args.source_gif, message=message, device=device)
 
