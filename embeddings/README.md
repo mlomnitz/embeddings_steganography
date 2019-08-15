@@ -1,0 +1,2 @@
+### Embeddings
+This folder contains the embeddings needed to convert the text into vectors.  The default behaviour uses the 50-dimensional [GLoVE](https://nlp.stanford.edu/projects/glove/) embeddings with a vocabulary of 400 K words.
