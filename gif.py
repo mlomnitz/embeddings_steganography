@@ -22,12 +22,20 @@ def process_gif(path=''):
     Returns
     -------
     """
-    with wandImage(filename=path) as img:
-        img.coalesce()
-        img.format = 'png'
-        img.save(filename='./gif/frame%05d.png')
-        
+    if os.path.isdir('./gif') is False:
+        os.mkdir('./gif')
+    
+    frame = Image.open(path)
+    n_frame = 0
+    while frame:
+        frame.save('./gif/frame{:05d}.png'.format(n_frame), 'PNG')
+        n_frame += 1
+        try:
+            frame.seek( n_frame)
+        except EOFError:
+            break
 
+        
 def save_frame(frame, output):
     """ Saves png frames from an input torch tensor
 
@@ -58,8 +66,9 @@ def frames_to_gif(save_path='./message.png'):
     -------    
 
     """
-    n_frames = len(os.listdir('./gif'))
+    n_frames = len(os.listdir('./container_gif'))
     im = APNG()
+    print(n_frames)
     for idx in range(n_frames):
         im.append_file('./gif/frame{0:05d}.png'.format(idx), delay=50)
     im.save(save_path)
@@ -136,7 +145,9 @@ def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device=torch.dev
 
     Returns
     -------    
-    """    
+    """
+    if os.path.isdir('./container_gif') is False:
+        os.mkdir('./container_gif')
     gif_loader = DataLoader(gif_dataset, batch_size=1,
                             shuffle=False, num_workers=1)
     for idx, cover in enumerate(gif_loader):
@@ -146,11 +157,11 @@ def encode_gif(gif_dataset, hider, encoder_decoder, embeddings, device=torch.dev
             end_token = [encoder_decoder.word2idx['______________________________________']]
             blank_tokens = [encoder_decoder.word2idx['blank']]*19 + end_token
             blank_embeddings = encoder_decoder.label_2_embeddings(torch.LongTensor(blank_tokens))
-            cover, secret, container = hider.hide_message(encoder_decoder.encoder, blank_embeddings, cover, device=device)
-            save_frame(cover[0], output='./gif/frame{0:05d}.png'.format(idx))
+            cover, secret, container = hider.hide_message(encoder_decoder.encoder, blank_embeddings, cover)
+            save_frame(container[0], output='./container_gif/frame{0:05d}.png'.format(idx))
         else:
-            cover, secret, container = hider.hide_message(encoder_decoder.encoder, embeddings[lower:upper], cover, device=device)
-            fig = save_frame(container[0], output='./gif/frame{0:05d}.png'.format(idx))
+            cover, secret, container = hider.hide_message(encoder_decoder.encoder, embeddings[lower:upper], cover)
+            fig = save_frame(container[0], output='./container_gif/frame{0:05d}.png'.format(idx))
     frames_to_gif()
     
    
