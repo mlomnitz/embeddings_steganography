@@ -1,15 +1,27 @@
-
-import subprocess
-import models
 import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
-from wand.image import Image as wandImage
 from apng import APNG
 
+
+def process_apng(path=''):
+    """ Processes apng and saves individual frames to png
+
+    Parameters
+    ----------
+    path : str
+        Path to input apng to process
+
+    Returns
+    -------
+    """
+    im = APNG.open(path)
+    for i, (png, control) in enumerate(im.frames):
+        png.save('./gif/frame{:05d}.png'.format(i))
+        
 
 def process_gif(path=''):
     """ Processes gif and saves individual frames to png
@@ -68,9 +80,8 @@ def frames_to_gif(save_path='./message.png'):
     """
     n_frames = len(os.listdir('./container_gif'))
     im = APNG()
-    print(n_frames)
     for idx in range(n_frames):
-        im.append_file('./gif/frame{0:05d}.png'.format(idx), delay=50)
+        im.append_file('./container_gif/frame{0:05d}.png'.format(idx), delay=50)
     im.save(save_path)
     
 
@@ -184,7 +195,7 @@ def decode_gif(reveal_net, encoder_decoder, gif_path='',
     message : str
         Recovered message
     """
-    process_gif(gif_path)
+    process_apng(gif_path)
     encoded_frames = GIFDataset(folder_path='./gif')
     frameloader = DataLoader(encoded_frames, batch_size=1, shuffle=False,
                              num_workers=1)
@@ -196,7 +207,6 @@ def decode_gif(reveal_net, encoder_decoder, gif_path='',
         else:
             frame = frame.to(device)
             revealed = reveal_net.recover_message(reveal_net.model,
-                                                  encoder_decoder, frame,
-                                                  device=device)
+                                                  encoder_decoder, frame)
             message += ' '+revealed
     return message
