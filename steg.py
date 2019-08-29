@@ -1,3 +1,6 @@
+"""
+WARNING - This document and related “CodeNitz” project material may contain technical information, export of which may be restricted by the Export Administration Regulations (EAR).  This project is subject to a license exception, which permits transfer of technical information to certain foreign entities, including IQT’s UK and Australian affiliates, and New Zealand Contractor Josh Bailey and his company OSDL, exclusively for “internal development or production of new products”.  Beyond this, IQT personnel must consult with IQT Legal prior to disclosing any project-related information publicly or to foreign persons.  IQT Legal will continue to review the classification of this technology as it is developed, and will update this marking accordingly.
+"""
 import os
 import glob
 import argparse
@@ -61,7 +64,8 @@ def run_encode(encoder_decoder, hnet, rnet, source_gif, message, device,
     gif_dataset = gif.GIFDataset(folder_path='./gif')
     #
     labels = encoder_decoder.message_2_labels(message)
-    embeddings = encoder_decoder.label_2_embeddings(torch.LongTensor(labels)).to(device)
+    embeddings = encoder_decoder.label_2_embeddings(
+        torch.LongTensor(labels)).to(device)
     #
     print('Encoding message')
     gif.encode_gif(gif_dataset=gif_dataset, hider=hnet,
@@ -108,7 +112,7 @@ def run_decode(encoder_decoder, rnet, device):
         os.remove(f)
     print('Decoded message: \n{}'.format(reco_message))
     with open("./message.txt", "w") as text_file:
-        text_file.write(reco_message)  
+        text_file.write(reco_message)
 
 
 if __name__ == '__main__':

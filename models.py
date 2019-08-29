@@ -1,3 +1,6 @@
+"""
+WARNING - This document and related “CodeNitz” project material may contain technical information, export of which may be restricted by the Export Administration Regulations (EAR).  This project is subject to a license exception, which permits transfer of technical information to certain foreign entities, including IQT’s UK and Australian affiliates, and New Zealand Contractor Josh Bailey and his company OSDL, exclusively for “internal development or production of new products”.  Beyond this, IQT personnel must consult with IQT Legal prior to disclosing any project-related information publicly or to foreign persons.  IQT Legal will continue to review the classification of this technology as it is developed, and will update this marking accordingly.
+"""
 # File handling
 import bcolz
 import pickle
@@ -63,7 +66,7 @@ class StegEncoderDecoder():
         -------    
         converted_tokens : list(int)
             List of tokens representing message
-        """  
+        """
         message_tokens = re.findall(r"[\w']+|[.,!?;]", message)
 
         pad_length = self.n_words * \
@@ -106,7 +109,7 @@ class StegEncoderDecoder():
         -------    
         embedding : torch.tensor
             Torch tensor containg the batch of embeddings
-        """  
+        """
         embedding = torch.FloatTensor(labels.shape[0], embedding_size).zero_()
         for idx, label in enumerate(labels):
             embedding[idx] = self.vectors[label]
@@ -126,7 +129,7 @@ class Hnet():
 
         Returns
         -------    
-        """  
+        """
         self.model = UnetGenerator(input_nc=6, output_nc=3, num_downs=7,
                                    output_function=nn.Sigmoid).to(device)
         if Hnet_path is not None:
@@ -153,7 +156,7 @@ class Hnet():
             Encoded message image
         container_img : torch.tensor
             Container image with hidden message
-        """  
+        """
         with torch.set_grad_enabled(False):
             message_image = encoder(embedding.to(self.device))
             cat_image = torch.cat(
@@ -172,7 +175,7 @@ class Rnet():
             Device to run processes
         Returns
         -------    
-        """  
+        """
         self.model = RevealNet(output_function=nn.Sigmoid).to(device)
         if Rnet_path is not None:
             self.model.load_state_dict(torch.load(Rnet_path))
@@ -194,7 +197,7 @@ class Rnet():
         -------    
         message : str
             Revealed and decoded message
-        """  
+        """
         with torch.set_grad_enabled(False):
             encoder_decoder.decoder.eval()
             message = []
@@ -227,7 +230,7 @@ class Encoder(nn.Module):
             convolution
         Returns
         -------    
-        """  
+        """
         super(Encoder, self).__init__()
         self.n_words = n_words
         self.embeddings_dim = embeddings_dim
@@ -260,7 +263,7 @@ class Encoder(nn.Module):
         -------    
         prediction : torch.tensor
             Prediction torch tensor
-        """  
+        """
         x = x.view(-1, self.embeddings_dim*self.n_words)
         x = self.fc(x)
         x = x.reshape(x.shape[0], 256, 16, 16)
@@ -281,7 +284,7 @@ class Decoder(nn.Module):
 
         Returns
         -------    
-        """  
+        """
         super(Decoder, self).__init__()
         self.n_words = n_words
         # Model sizes
@@ -305,7 +308,7 @@ class Decoder(nn.Module):
         -------    
         embeddings : torch.tensor
             Decoded embeddings tensor (B*n_words, embeddings_dim) 
-        """  
+        """
         for layer in self.up_path:
             x = layer(x)
         x = x.view(x.shape[0], -1)
@@ -326,7 +329,7 @@ class UpsampleBlock(nn.Module):
 
         Returns
         -------    
-        """  
+        """
         super(UpsampleBlock, self).__init__()
         self.upsample_block = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear'),
@@ -345,7 +348,7 @@ class UpsampleBlock(nn.Module):
         -------    
         x : torch.tensor
             Processed tensor (B, output_size, 2*H, 2*W)
-        """  
+        """
         return self.upsample_block(x)
 
 
@@ -363,7 +366,7 @@ class DeconvBlock(nn.Module):
 
         Returns
         -------    
-        """  
+        """
         super(DeconvBlock, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_size, inter_size, kernel_size=3, padding=1, stride=1),
@@ -383,7 +386,7 @@ class DeconvBlock(nn.Module):
         -------    
         x : torch.tensor
             Processed tensor (B, output_size, 2*H, 2*W)
-        """  
+        """
         x = self.conv(x)
         x = self.deconv(x)
         return x
@@ -401,7 +404,7 @@ class ConvBlock(nn.Module):
 
         Returns
         -------   
-        """  
+        """
         super(ConvBlock, self).__init__()
         self.block = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
@@ -423,7 +426,7 @@ class ConvBlock(nn.Module):
         -------    
         x : torch.tensor
             Processed tensor (B, output_size, H/2, W/2)
-        """          
+        """
         return self.block(x)
 
 
@@ -451,7 +454,7 @@ class UnetGenerator(nn.Module):
             Output activation function for last layer
         Returns
         -------    
-        """  
+        """
         super(UnetGenerator, self).__init__()
         unet_block = UnetSkipConnectionBlock(
             ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
@@ -479,7 +482,7 @@ class UnetGenerator(nn.Module):
         -------    
         x : torch.tensor
             Processed tensor size (B, output_nc, H, W)
-        """  
+        """
         return self.model(input)
 
 
@@ -508,7 +511,7 @@ class UnetSkipConnectionBlock(nn.Module):
             Activation function to apply on output
         Returns
         -------    
-        """  
+        """
         super(UnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
         if type(norm_layer) == functools.partial:
@@ -566,7 +569,7 @@ class UnetSkipConnectionBlock(nn.Module):
         -------    
         x : torch.tensor
             Processed tensor
-        """   
+        """
         if self.outermost:
             return self.model(x)
         else:
@@ -587,7 +590,7 @@ class RevealNet(nn.Module):
 
         Returns
         -------    
-        """   
+        """
         super(RevealNet, self).__init__()
         # input is (3) x 256 x 256
         self.main = nn.Sequential(
@@ -620,6 +623,6 @@ class RevealNet(nn.Module):
         Returns
         -------    
         output : torch.tensor (B, 3, H, W)
-        """   
+        """
         output = self.main(input)
         return output
