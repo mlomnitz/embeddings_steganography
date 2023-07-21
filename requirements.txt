@@ -1,7 +1,7 @@
 matplotlib==3.0.2
 numpy==1.15.4
 torchvision==0.2.1
-torch==1.0.0
+torch==1.13.1
 bcolz==1.2.1
 Pillow==6.1.0
 apng==0.3.3
