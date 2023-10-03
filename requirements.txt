@@ -3,5 +3,5 @@ numpy==1.15.4
 torchvision==0.2.1
 torch==1.0.0
 bcolz==1.2.1
-Pillow==6.1.0
+Pillow==10.0.1
 apng==0.3.3
